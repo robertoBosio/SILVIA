@@ -17,29 +17,19 @@ namespace eval SILVIA {
 		variable DEBUG_FILE
 
 		set project_path [get_project -directory]
-		set solution_name [get_solution]
-		if { [file exists ${project_path}/${solution_name}_FE] } {
-		  file delete -force -- ${project_path}/${solution_name}_FE
+		write_ini
+		if { [file exists ${project_path}_FE] } {
+		  file delete -force -- ${project_path}_FE
 		}
-		file copy -force -- ${project_path}/${solution_name} ${project_path}/${solution_name}_FE
-		file rename ${project_path}/${solution_name}_FE/${solution_name}.aps ${project_path}/${solution_name}_FE/${solution_name}_FE.aps
-		set aps_file [open ${project_path}/${solution_name}_FE/${solution_name}_FE.aps r]
-		set doc [dom parse [read ${aps_file}]]
-		close ${aps_file}
-		set root [${doc} documentElement]
-		set solution_name_node [${root} selectNode "/AutoPilot:solution/name/value"]
-		${solution_name_node} setAttribute string ${solution_name}_FE
-		set aps_file [open ${project_path}/${solution_name}_FE/${solution_name}_FE.aps w]
-		puts ${aps_file} [${doc} asXML]
-		close ${aps_file}
-		exec vitis_hls -l vitis_hls_FE.log -eval "open_project ${project_path}; open_solution ${solution_name}_FE; csynth_design; exit" &
-		while {[file exist ${project_path}/${solution_name}_FE/.autopilot/db/dut.hcp] == 0} {
+		exec sh -c "echo 'open_component ${project_path}_FE; apply_ini ${project_path}/hls_config.cfg; csynth_design; exit' | vitis-run --mode hls --itcl" &
+		
+		while {[file exist ${project_path}_FE/hls/.autopilot/db/dut.hcp] == 0} {
 			after 3000
 		}
-		set db_path ${project_path}/${solution_name}/.autopilot/db
+		set db_path ${project_path}/hls/.autopilot/db
 		set dut_path ${db_path}/dut
 		file mkdir ${dut_path}
-		exec unzip -o -d ${dut_path} ${project_path}/${solution_name}_FE/.autopilot/db/dut.hcp
+		exec unzip -o -d ${dut_path} ${project_path}_FE/hls/.autopilot/db/dut.hcp
 		if {${DEBUG} == 1} {
 			file delete ${DEBUG_FILE}
 		}
@@ -99,7 +89,7 @@ namespace eval SILVIA {
 			eval exec ${opt_cmd}
 		}
 		exec zip -rj ${db_path}/dut.hcp ${dut_path}
-		open_solution ${solution_name}
+		open_component ${project_path}
 		read_checkpoint ${db_path}/dut.hcp
 		::csynth_design -hw_syn
 	
@@ -147,7 +137,7 @@ namespace eval SILVIA {
 						set extension "vhd"
 					}
 					set name "_silvia_${instruction}_${op_size}b"
-					foreach f [glob -nocomplain ${project_path}/${solution_name}/${dir}/${lang}/*${name}*.${extension}] {
+					foreach f [glob -nocomplain ${project_path}/hls/${dir}/${lang}/*${name}*.${extension}] {
 						set fbasename [file tail $f]
 						if {[regexp "^(.*${name}.*)\.${extension}\$" $fbasename -> module_name]} {
 							file copy -force ${ROOT}/template/${op}/${op}_${op_size}b.${extension} $f
